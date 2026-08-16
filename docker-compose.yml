@@ -1,0 +1,16 @@
+services:
+  # Official MongoDB Atlas Local container (Exact Atlas features: Replica Set, Atlas Search, Vector Search)
+  mongodb-atlas:
+    image: mongodb/mongodb-atlas-local:latest
+    container_name: moztype-atlas-local
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=admin
+      - MONGODB_INITDB_ROOT_PASSWORD=password123
+    volumes:
+      - atlas_data:/data/db
+
+volumes:
+  atlas_data:
