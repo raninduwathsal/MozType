@@ -7,16 +7,16 @@ import {
   Quote as QuoteIcon,
   Search,
   Flame,
-  Crown,
   Sparkles,
-  ShieldCheck,
-  User,
+  ChevronLeft,
+  ChevronRight,
   PlusCircle
 } from 'lucide-react';
 import { TestMode, LeaderboardEntry, UserSession } from '../types';
 import { StorageDAL } from '../utils/storage';
-
 import { MozTypeApi } from '../utils/api';
+
+const PAGE_SIZE = 15;
 
 interface LeaderboardPageProps {
   currentSession: UserSession | null;
@@ -33,9 +33,15 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
   const [selectedDetail, setSelectedDetail] = useState<string | number>(15);
   const [searchQuery, setSearchQuery] = useState('');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [isLiveDb, setIsLiveDb] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
+  // Reset pagination on filter or search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedMode, selectedDetail, searchQuery]);
+
+  // Load Leaderboard from MongoDB Atlas
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -45,7 +51,6 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
       const liveData = await MozTypeApi.getLeaderboard(selectedMode, selectedDetail, 'english', searchQuery);
       if (isMounted && liveData !== null) {
         setEntries(liveData);
-        setIsLiveDb(true);
         setIsLoading(false);
         return;
       }
@@ -54,7 +59,6 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
       if (isMounted) {
         const localData = StorageDAL.getLeaderboard(selectedMode, selectedDetail);
         setEntries(localData);
-        setIsLiveDb(false);
         setIsLoading(false);
       }
     }
@@ -63,12 +67,14 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
     return () => { isMounted = false; };
   }, [selectedMode, selectedDetail, searchQuery]);
 
-  const filteredEntries = isLiveDb
-    ? entries
-    : entries.filter(e => e.username.toLowerCase().includes(searchQuery.trim().toLowerCase()));
+  const filteredEntries = entries.filter(e =>
+    e.username.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  );
 
   const topWpm = entries.length > 0 ? Math.round(entries[0].wpm) : 0;
-  const totalRanked = entries.length;
+  const totalRanked = filteredEntries.length;
+  const totalPages = Math.max(1, Math.ceil(totalRanked / PAGE_SIZE));
+  const paginatedEntries = filteredEntries.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const formatDate = (timestamp: number) => {
     const d = new Date(timestamp);
@@ -125,17 +131,12 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
       {/* Hero Title & Stats Banner */}
       <div className="lb-hero-banner">
         <div className="lb-hero-text">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <Trophy size={28} color="var(--color-accent)" />
             <h1 className="lb-hero-title">Official Leaderboards</h1>
-            {isLiveDb && (
-              <span className="lb-live-chip" title="Connected directly to MongoDB Atlas online cluster">
-                <span className="live-dot" /> Live Atlas Connected
-              </span>
-            )}
           </div>
           <p className="lb-hero-subtitle">
-            Anti-cheat verified rankings synced with MongoDB Atlas cluster.
+            Anti-cheat verified rankings for finalized typist sessions.
           </p>
         </div>
 
@@ -146,7 +147,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
           </div>
           <div className="lb-stat-card">
             <span className="lb-stat-label">Ranked Typists</span>
-            <span className="lb-stat-val">{totalRanked}</span>
+            <span className="lb-stat-val">{isLoading ? '...' : totalRanked}</span>
           </div>
           <div className="lb-stat-card">
             <span className="lb-stat-label">Active Mode</span>
@@ -270,7 +271,22 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
             </tr>
           </thead>
           <tbody>
-            {filteredEntries.length === 0 ? (
+            {isLoading ? (
+              // Sleek Loading Skeleton Shimmer
+              <>
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <tr key={`skeleton_${i}`} className="lb-skeleton-row">
+                    <td><div className="skeleton-pill rank" /></td>
+                    <td><div className="skeleton-pill user" /></td>
+                    <td><div className="skeleton-pill wpm" /></td>
+                    <td><div className="skeleton-pill stat" /></td>
+                    <td><div className="skeleton-pill stat" /></td>
+                    <td><div className="skeleton-pill stat" /></td>
+                    <td><div className="skeleton-pill date" /></td>
+                  </tr>
+                ))}
+              </>
+            ) : paginatedEntries.length === 0 ? (
               <tr>
                 <td colSpan={7} className="lb-empty-cell">
                   <div className="lb-empty-state">
@@ -289,14 +305,14 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
                 </td>
               </tr>
             ) : (
-              filteredEntries.map((entry) => {
+              paginatedEntries.map((entry) => {
                 const isCurrentUser =
                   currentSession &&
                   currentSession.username.toLowerCase() === entry.username.toLowerCase();
 
                 return (
                   <tr
-                    key={entry.id}
+                    key={entry.id || `entry_${entry.rank}_${entry.username}`}
                     className={isCurrentUser ? 'current-user-row' : ''}
                   >
                     <td>
@@ -363,6 +379,53 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
             )}
           </tbody>
         </table>
+
+        {/* Pagination Controls */}
+        {!isLoading && totalRanked > 0 && (
+          <div className="lb-pagination-bar">
+            <div className="lb-pagination-info">
+              Showing <strong style={{ color: 'var(--color-main)' }}>{(currentPage - 1) * PAGE_SIZE + 1}</strong> to{' '}
+              <strong style={{ color: 'var(--color-main)' }}>{Math.min(currentPage * PAGE_SIZE, totalRanked)}</strong> of{' '}
+              <strong style={{ color: 'var(--color-accent)' }}>{totalRanked}</strong> ranked typists
+            </div>
+
+            {totalPages > 1 && (
+              <div className="lb-pagination-actions">
+                <button
+                  className="btn-secondary pagination-btn"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  title="Previous Page"
+                >
+                  <ChevronLeft size={16} />
+                  <span>Prev</span>
+                </button>
+
+                <div className="lb-page-numbers">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      className={`page-num-btn ${currentPage === page ? 'active' : ''}`}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  className="btn-secondary pagination-btn"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  title="Next Page"
+                >
+                  <span>Next</span>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

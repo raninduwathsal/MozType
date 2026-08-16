@@ -38,7 +38,10 @@ export default async function handler(req, res) {
         username: cleanUsername
       }, { collation: { locale: 'en', strength: 2 } });
 
-      if (existingUser) {
+      const isFinalized = Boolean(existingUser);
+      console.log(`[Vercel Serverless /api/session] Username check for "${cleanUsername}": ${isFinalized ? 'TAKEN & FINALIZED' : 'AVAILABLE'}`);
+
+      if (isFinalized) {
         return res.status(200).json({
           success: false,
           finalized: true,
@@ -86,7 +89,6 @@ export default async function handler(req, res) {
 
       // If bestWpm > 0, update leaderboard entry
       if (bestWpm > 0) {
-        // Calculate new rank
         const higherCount = await lbCol.countDocuments({
           mode,
           mode2: isNaN(Number(mode2)) ? mode2 : Number(mode2),
@@ -121,6 +123,8 @@ export default async function handler(req, res) {
           { $set: lbEntry },
           { upsert: true, collation: { locale: 'en', strength: 2 } }
         );
+
+        console.log(`[Vercel Serverless /api/session] Finalized session for @${cleanUsername}: ${bestWpm} WPM -> Ranked #${newRank} in ${mode} ${mode2}`);
       }
 
       return res.status(200).json({
@@ -133,7 +137,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ success: false, error: 'Invalid action' });
   } catch (error) {
-    console.error('Error in /api/session:', error);
+    console.error('[Vercel Serverless Error /api/session]:', error);
     return res.status(500).json({
       success: false,
       error: error.message || 'Internal Server Error'

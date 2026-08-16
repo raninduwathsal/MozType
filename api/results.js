@@ -60,13 +60,15 @@ export default async function handler(req, res) {
 
     const insertResult = await resultsCol.insertOne(resultDoc);
 
+    console.log(`[Vercel Serverless /api/results] Recorded test result for @${resultDoc.username}: ${wpm} WPM / ${acc}% ACC (${mode} ${mode2}) -> ID: ${insertResult.insertedId}`);
+
     return res.status(201).json({
       success: true,
       id: insertResult.insertedId,
       message: 'Result recorded successfully in MongoDB Atlas'
     });
   } catch (error) {
-    console.error('Error in /api/results:', error);
+    console.error('[Vercel Serverless Error /api/results]:', error);
     return res.status(500).json({
       success: false,
       error: error.message || 'Internal Server Error'

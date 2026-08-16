@@ -1,7 +1,6 @@
 import { connectToDatabase } from './lib/db.js';
 
 export default async function handler(req, res) {
-  // Enable CORS for API requests
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -30,12 +29,14 @@ export default async function handler(req, res) {
       query.username = { $regex: search.trim(), $options: 'i' };
     }
 
-    // Try matching with string mode2 as fallback if number doesn't match
-    let entries = await lbCol.find(query).sort({ rank: 1 }).limit(100).toArray();
+    // Try matching with numeric mode2, fallback to string if necessary
+    let entries = await lbCol.find(query).sort({ rank: 1 }).limit(250).toArray();
     if (entries.length === 0 && !isNaN(Number(mode2))) {
       query.mode2 = String(mode2);
-      entries = await lbCol.find(query).sort({ rank: 1 }).limit(100).toArray();
+      entries = await lbCol.find(query).sort({ rank: 1 }).limit(250).toArray();
     }
+
+    console.log(`[Vercel Serverless /api/leaderboard] Query: mode=${mode}, mode2=${mode2}, search="${search}" | Found: ${entries.length} typists`);
 
     return res.status(200).json({
       success: true,
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
       language
     });
   } catch (error) {
-    console.error('Error in /api/leaderboard:', error);
+    console.error('[Vercel Serverless Error /api/leaderboard]:', error);
     return res.status(500).json({
       success: false,
       error: error.message || 'Internal Server Error'

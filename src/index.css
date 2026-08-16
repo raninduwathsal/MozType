@@ -1400,6 +1400,123 @@ html, body {
   padding-left: 6px;
 }
 
+/* Loading Skeleton Shimmer */
+@keyframes skeletonShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.lb-skeleton-row td {
+  padding: 1.15rem 1.25rem !important;
+}
+
+.skeleton-pill {
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--color-surface) 25%, rgba(255, 255, 255, 0.06) 50%, var(--color-surface) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s infinite ease-in-out;
+}
+
+.skeleton-pill.rank {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.skeleton-pill.user {
+  width: 140px;
+}
+
+.skeleton-pill.wpm {
+  width: 55px;
+  height: 22px;
+}
+
+.skeleton-pill.stat {
+  width: 48px;
+}
+
+.skeleton-pill.date {
+  width: 90px;
+}
+
+/* Pagination Bar */
+.lb-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--color-surface-border);
+  background: rgba(255, 255, 255, 0.01);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.lb-pagination-info {
+  font-size: 0.85rem;
+  color: var(--color-sub);
+  font-family: var(--font-mono);
+}
+
+.lb-pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.pagination-btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.lb-page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.page-num-btn {
+  background: var(--color-surface);
+  border: 1px solid var(--color-surface-border);
+  color: var(--color-sub);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.page-num-btn:hover {
+  color: var(--color-main);
+  border-color: var(--color-main);
+}
+
+.page-num-btn.active {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border-color: var(--color-accent);
+}
+
 .lb-empty-cell {
   padding: 4rem 2rem !important;
   text-align: center;
