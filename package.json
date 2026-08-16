@@ -6,10 +6,20 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:setup": "node scripts/setup-db.js",
+    "db:setup:local": "node scripts/setup-db.js --local",
+    "db:setup:atlas": "node scripts/setup-db.js --atlas",
+    "db:seed": "node scripts/seed.js",
+    "db:seed:local": "node scripts/seed-local.js",
+    "db:seed:atlas": "node scripts/seed-atlas.js",
+    "db:update:local": "node scripts/update-leaderboards.js --local",
+    "db:update:atlas": "node scripts/update-leaderboards.js --atlas"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "lucide-react": "^1.16.0",
+    "mongodb": "^6.13.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

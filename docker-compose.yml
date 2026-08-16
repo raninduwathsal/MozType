@@ -1,5 +1,5 @@
 services:
-  # Official MongoDB Atlas Local container (Exact Atlas features: Replica Set, Atlas Search, Vector Search)
+  # Official MongoDB Atlas Local container (Exact Atlas features: Single-node Replica Set, Atlas Search, Vector Search)
   mongodb-atlas:
     image: mongodb/mongodb-atlas-local:latest
     container_name: moztype-atlas-local
@@ -11,6 +11,13 @@ services:
       - MONGODB_INITDB_ROOT_PASSWORD=password123
     volumes:
       - atlas_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ping: 1})' 'mongodb://admin:password123@localhost:27017/?authSource=admin&directConnection=true' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 volumes:
   atlas_data:
+    name: moztype_atlas_data
