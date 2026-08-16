@@ -23,6 +23,7 @@ import {
 } from './types';
 
 import { StorageDAL, DEFAULT_SETTINGS } from './utils/storage';
+import { MozTypeApi } from './utils/api';
 import { applyTheme } from './utils/theme-manager';
 import { SoundEngine } from './core/sound-engine';
 import { AntiCheatValidator } from './core/anti-cheat';
@@ -116,8 +117,18 @@ export const App: React.FC = () => {
     handleResetTest();
   };
 
-  // Finalize Session (locks username and submits high score to leaderboard)
+  // Finalize Session (locks username and submits high score to MongoDB Atlas)
   const handleFinalizeSession = () => {
+    if (currentSession && currentSession.active) {
+      // Sync with live MongoDB Atlas
+      MozTypeApi.finalizeSession({
+        username: currentSession.username,
+        bestWpm: currentSession.bestWpm,
+        mode,
+        modeDetail: mode === 'time' ? timeDuration : mode === 'words' ? wordCount : quoteLength
+      });
+    }
+
     const { finalizedSession } = StorageDAL.finalizeSession();
     setCurrentSession(null);
   };
@@ -140,7 +151,7 @@ export const App: React.FC = () => {
     }
     rawResult.isPb = isPb;
 
-    // 3. Save to history
+    // 3. Save to local history
     StorageDAL.saveTestResult(rawResult);
 
     // 4. Update session score if active
@@ -151,8 +162,11 @@ export const App: React.FC = () => {
       }
     }
 
+    // 5. Asynchronously persist result to live MongoDB Atlas
+    MozTypeApi.submitResult(rawResult);
+
     setTestResult(rawResult);
-  }, [currentSession]);
+  }, [currentSession, mode, timeDuration, wordCount, quoteLength]);
 
   // Global Keyboard Shortcuts (Esc / Ctrl+K for command palette)
   useEffect(() => {

@@ -16,6 +16,8 @@ import {
 import { TestMode, LeaderboardEntry, UserSession } from '../types';
 import { StorageDAL } from '../utils/storage';
 
+import { MozTypeApi } from '../utils/api';
+
 interface LeaderboardPageProps {
   currentSession: UserSession | null;
   onNavigateToTest: () => void;
@@ -31,15 +33,39 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
   const [selectedDetail, setSelectedDetail] = useState<string | number>(15);
   const [searchQuery, setSearchQuery] = useState('');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [isLiveDb, setIsLiveDb] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const data = StorageDAL.getLeaderboard(selectedMode, selectedDetail);
-    setEntries(data);
-  }, [selectedMode, selectedDetail]);
+    let isMounted = true;
+    setIsLoading(true);
 
-  const filteredEntries = entries.filter(e =>
-    e.username.toLowerCase().includes(searchQuery.trim().toLowerCase())
-  );
+    async function loadData() {
+      // 1. Fetch from live MongoDB Atlas backend
+      const liveData = await MozTypeApi.getLeaderboard(selectedMode, selectedDetail, 'english', searchQuery);
+      if (isMounted && liveData !== null) {
+        setEntries(liveData);
+        setIsLiveDb(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Fallback to local storage if API is unreachable
+      if (isMounted) {
+        const localData = StorageDAL.getLeaderboard(selectedMode, selectedDetail);
+        setEntries(localData);
+        setIsLiveDb(false);
+        setIsLoading(false);
+      }
+    }
+
+    loadData();
+    return () => { isMounted = false; };
+  }, [selectedMode, selectedDetail, searchQuery]);
+
+  const filteredEntries = isLiveDb
+    ? entries
+    : entries.filter(e => e.username.toLowerCase().includes(searchQuery.trim().toLowerCase()));
 
   const topWpm = entries.length > 0 ? Math.round(entries[0].wpm) : 0;
   const totalRanked = entries.length;
@@ -99,12 +125,17 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
       {/* Hero Title & Stats Banner */}
       <div className="lb-hero-banner">
         <div className="lb-hero-text">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
             <Trophy size={28} color="var(--color-accent)" />
             <h1 className="lb-hero-title">Official Leaderboards</h1>
+            {isLiveDb && (
+              <span className="lb-live-chip" title="Connected directly to MongoDB Atlas online cluster">
+                <span className="live-dot" /> Live Atlas Connected
+              </span>
+            )}
           </div>
           <p className="lb-hero-subtitle">
-            Anti-cheat verified rankings for finalized typist sessions.
+            Anti-cheat verified rankings synced with MongoDB Atlas cluster.
           </p>
         </div>
 
