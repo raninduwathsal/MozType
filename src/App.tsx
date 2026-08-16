@@ -4,7 +4,7 @@ import { ModeSelector } from './components/ModeSelector';
 import { TypingArea } from './components/TypingArea';
 import { ResultsModal } from './components/ResultsModal';
 import { SessionModal } from './components/SessionModal';
-import { LeaderboardView } from './components/LeaderboardView';
+import { LeaderboardPage } from './components/LeaderboardPage';
 import { ProfileModal } from './components/ProfileModal';
 import { SettingsModal } from './components/SettingsModal';
 import { CustomTextModal } from './components/CustomTextModal';
@@ -29,6 +29,38 @@ import { AntiCheatValidator } from './core/anti-cheat';
 import { Terminal, Shield, Sparkles, Command } from 'lucide-react';
 
 export const App: React.FC = () => {
+  // Routing ('/' for typing test, '/leaderboard' for fullscreen leaderboard page)
+  const [currentRoute, setCurrentRoute] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
+      if (path === '/leaderboard' || path.startsWith('/leaderboard')) {
+        return '/leaderboard';
+      }
+    }
+    return '/';
+  });
+
+  const navigateTo = useCallback((route: string) => {
+    setCurrentRoute(route);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', route);
+    }
+  }, []);
+
+  // Listen to browser Back/Forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname.toLowerCase();
+      if (path === '/leaderboard' || path.startsWith('/leaderboard')) {
+        setCurrentRoute('/leaderboard');
+      } else {
+        setCurrentRoute('/');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Settings & Theme
   const [settings, setSettings] = useState<UserSettings>(() => StorageDAL.getSettings());
 
@@ -58,7 +90,6 @@ export const App: React.FC = () => {
 
   // Modals
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
@@ -132,14 +163,12 @@ export const App: React.FC = () => {
       } else if (e.key === 'Escape') {
         if (
           sessionModalOpen ||
-          leaderboardOpen ||
           profileOpen ||
           settingsOpen ||
           customModalOpen ||
           commandPaletteOpen
         ) {
           setSessionModalOpen(false);
-          setLeaderboardOpen(false);
           setProfileOpen(false);
           setSettingsOpen(false);
           setCustomModalOpen(false);
@@ -154,7 +183,6 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [
     sessionModalOpen,
-    leaderboardOpen,
     profileOpen,
     settingsOpen,
     customModalOpen,
@@ -163,73 +191,84 @@ export const App: React.FC = () => {
 
   return (
     <div className="moztype-app">
-      {/* Top Navigation & Session Header */}
-      <Header
-        currentSession={currentSession}
-        onOpenSessionModal={() => setSessionModalOpen(true)}
-        onOpenLeaderboard={() => setLeaderboardOpen(true)}
-        onOpenProfile={() => setProfileOpen(true)}
-        onOpenSettings={() => setSettingsOpen(true)}
-        onResetTest={handleResetTest}
-      />
-
-      {/* Main Mode & Modifiers Bar (visible during test) */}
-      {!testResult && (
-        <ModeSelector
-          mode={mode}
-          timeDuration={timeDuration}
-          wordCount={wordCount}
-          quoteLength={quoteLength}
-          modifiers={modifiers}
-          onSelectMode={newMode => {
-            setMode(newMode);
-            handleResetTest();
-          }}
-          onSelectTimeDuration={newDuration => {
-            setTimeDuration(newDuration);
-            handleResetTest();
-          }}
-          onSelectWordCount={newCount => {
-            setWordCount(newCount);
-            handleResetTest();
-          }}
-          onSelectQuoteLength={newLength => {
-            setQuoteLength(newLength);
-            handleResetTest();
-          }}
-          onTogglePunctuation={() => {
-            setModifiers(m => ({ ...m, punctuation: !m.punctuation }));
-            handleResetTest();
-          }}
-          onToggleNumbers={() => {
-            setModifiers(m => ({ ...m, numbers: !m.numbers }));
-            handleResetTest();
-          }}
-          onOpenCustomModal={() => setCustomModalOpen(true)}
-        />
-      )}
-
-      {/* Main Interactive Stage */}
-      {testResult ? (
-        <ResultsModal
-          result={testResult}
-          onRestart={handleResetTest}
-          onNextTest={handleResetTest}
+      {/* Route Switcher: /leaderboard vs / */}
+      {currentRoute === '/leaderboard' ? (
+        <LeaderboardPage
+          currentSession={currentSession}
+          onNavigateToTest={() => navigateTo('/')}
+          onOpenSessionModal={() => setSessionModalOpen(true)}
         />
       ) : (
-        <TypingArea
-          key={testKey}
-          mode={mode}
-          timeDuration={timeDuration}
-          wordCount={wordCount}
-          quoteLength={quoteLength}
-          modifiers={modifiers}
-          customText={customText}
-          settings={settings}
-          username={currentSession?.username || 'Guest'}
-          onFinishTest={handleFinishTest}
-          onCapsLockChange={setIsCapsLock}
-        />
+        <>
+          {/* Top Navigation & Session Header */}
+          <Header
+            currentSession={currentSession}
+            onOpenSessionModal={() => setSessionModalOpen(true)}
+            onOpenLeaderboard={() => navigateTo('/leaderboard')}
+            onOpenProfile={() => setProfileOpen(true)}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onResetTest={handleResetTest}
+          />
+
+          {/* Main Mode & Modifiers Bar (visible during test) */}
+          {!testResult && (
+            <ModeSelector
+              mode={mode}
+              timeDuration={timeDuration}
+              wordCount={wordCount}
+              quoteLength={quoteLength}
+              modifiers={modifiers}
+              onSelectMode={newMode => {
+                setMode(newMode);
+                handleResetTest();
+              }}
+              onSelectTimeDuration={newDuration => {
+                setTimeDuration(newDuration);
+                handleResetTest();
+              }}
+              onSelectWordCount={newCount => {
+                setWordCount(newCount);
+                handleResetTest();
+              }}
+              onSelectQuoteLength={newLength => {
+                setQuoteLength(newLength);
+                handleResetTest();
+              }}
+              onTogglePunctuation={() => {
+                setModifiers(m => ({ ...m, punctuation: !m.punctuation }));
+                handleResetTest();
+              }}
+              onToggleNumbers={() => {
+                setModifiers(m => ({ ...m, numbers: !m.numbers }));
+                handleResetTest();
+              }}
+              onOpenCustomModal={() => setCustomModalOpen(true)}
+            />
+          )}
+
+          {/* Main Interactive Stage */}
+          {testResult ? (
+            <ResultsModal
+              result={testResult}
+              onRestart={handleResetTest}
+              onNextTest={handleResetTest}
+            />
+          ) : (
+            <TypingArea
+              key={testKey}
+              mode={mode}
+              timeDuration={timeDuration}
+              wordCount={wordCount}
+              quoteLength={quoteLength}
+              modifiers={modifiers}
+              customText={customText}
+              settings={settings}
+              username={currentSession?.username || 'Guest'}
+              onFinishTest={handleFinishTest}
+              onCapsLockChange={setIsCapsLock}
+            />
+          )}
+        </>
       )}
 
       {/* Caps Lock Alert Banner */}
@@ -242,13 +281,6 @@ export const App: React.FC = () => {
           onStartSession={handleStartSession}
           onFinalizeSession={handleFinalizeSession}
           onClose={() => setSessionModalOpen(false)}
-        />
-      )}
-
-      {leaderboardOpen && (
-        <LeaderboardView
-          currentSession={currentSession}
-          onClose={() => setLeaderboardOpen(false)}
         />
       )}
 
@@ -282,15 +314,15 @@ export const App: React.FC = () => {
         <CommandPalette
           onClose={() => setCommandPaletteOpen(false)}
           onSelectTheme={t => handleUpdateSettings({ theme: t })}
-          onSelectMode={m => { setMode(m); handleResetTest(); }}
-          onSelectTimeDuration={d => { setTimeDuration(d); handleResetTest(); }}
-          onSelectWordCount={w => { setWordCount(w); handleResetTest(); }}
+          onSelectMode={m => { setMode(m); handleResetTest(); navigateTo('/'); }}
+          onSelectTimeDuration={d => { setTimeDuration(d); handleResetTest(); navigateTo('/'); }}
+          onSelectWordCount={w => { setWordCount(w); handleResetTest(); navigateTo('/'); }}
           onSelectSound={s => handleUpdateSettings({ soundType: s })}
-          onOpenLeaderboard={() => setLeaderboardOpen(true)}
+          onOpenLeaderboard={() => navigateTo('/leaderboard')}
           onOpenProfile={() => setProfileOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenSessionModal={() => setSessionModalOpen(true)}
-          onRestartTest={handleResetTest}
+          onRestartTest={() => { handleResetTest(); navigateTo('/'); }}
         />
       )}
 
