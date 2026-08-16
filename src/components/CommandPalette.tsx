@@ -173,12 +173,23 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       onClose();
     }
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div
+      className="modal-backdrop"
+      onClick={onClose}
+      onKeyDown={e => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }
+      }}
+    >
       <div
         className="modal-card"
         style={{ maxWidth: '550px' }}
