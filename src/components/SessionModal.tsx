@@ -98,10 +98,16 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                     <User size={20} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--color-main)' }}>
-                      {currentSession.username}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--color-main)' }}>
+                        {currentSession.username}
+                      </span>
+                      <span className="lb-status-chip pending" style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem' }}>
+                        <span className="live-dot" />
+                        <span>In Session</span>
+                      </span>
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--color-sub)' }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-sub)', marginTop: '2px' }}>
                       {currentSession.testsCompleted} tests completed this session
                     </div>
                   </div>
@@ -118,8 +124,8 @@ export const SessionModal: React.FC<SessionModalProps> = ({
               </div>
 
               <p style={{ fontSize: '0.85rem', color: 'var(--color-sub)', lineHeight: 1.5 }}>
-                You are currently in an active session. Keep retrying typing tests to improve your WPM.
-                When you click <strong>Finalize Session</strong>, your highest score will be permanently registered on the Leaderboard and your username will be locked.
+                Your best score is already actively appearing on the live leaderboard marked as <strong>In Session / Pending</strong>. You can keep practicing to beat your speed.
+                When you click <strong>Finalize & Lock Score</strong>, your high score will be permanently registered and your username will be locked.
               </p>
 
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
@@ -132,7 +138,7 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                   }}
                 >
                   <Lock size={16} />
-                  <span>Finalize & Submit Score</span>
+                  <span>Finalize & Lock Score</span>
                 </button>
                 <button
                   className="btn-secondary"

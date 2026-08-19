@@ -10,7 +10,10 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
-  PlusCircle
+  PlusCircle,
+  CheckCircle2,
+  Lock,
+  Layers
 } from 'lucide-react';
 import { TestMode, LeaderboardEntry, UserSession } from '../types';
 import { StorageDAL } from '../utils/storage';
@@ -31,6 +34,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
 }) => {
   const [selectedMode, setSelectedMode] = useState<TestMode>('time');
   const [selectedDetail, setSelectedDetail] = useState<string | number>(15);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'finalized' | 'pending'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,16 +43,22 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
   // Reset pagination on filter or search change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedMode, selectedDetail, searchQuery]);
+  }, [selectedMode, selectedDetail, statusFilter, searchQuery]);
 
-  // Load Leaderboard from MongoDB Atlas
+  // Load Leaderboard from MongoDB Atlas or local storage
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
 
     async function loadData() {
       // 1. Fetch from live MongoDB Atlas backend
-      const liveData = await MozTypeApi.getLeaderboard(selectedMode, selectedDetail, 'english', searchQuery);
+      const liveData = await MozTypeApi.getLeaderboard(
+        selectedMode,
+        selectedDetail,
+        'english',
+        searchQuery,
+        statusFilter
+      );
       if (isMounted && liveData !== null) {
         setEntries(liveData);
         setIsLoading(false);
@@ -57,7 +67,12 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
 
       // 2. Fallback to local storage if API is unreachable
       if (isMounted) {
-        const localData = StorageDAL.getLeaderboard(selectedMode, selectedDetail);
+        let localData = StorageDAL.getLeaderboard(selectedMode, selectedDetail);
+        if (statusFilter === 'finalized') {
+          localData = localData.filter(e => e.isFinalized);
+        } else if (statusFilter === 'pending') {
+          localData = localData.filter(e => !e.isFinalized);
+        }
         setEntries(localData);
         setIsLoading(false);
       }
@@ -65,7 +80,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
 
     loadData();
     return () => { isMounted = false; };
-  }, [selectedMode, selectedDetail, searchQuery]);
+  }, [selectedMode, selectedDetail, statusFilter, searchQuery]);
 
   const filteredEntries = entries.filter(e =>
     e.username.toLowerCase().includes(searchQuery.trim().toLowerCase())
@@ -136,7 +151,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
             <h1 className="lb-hero-title">Official Leaderboards</h1>
           </div>
           <p className="lb-hero-subtitle">
-            Anti-cheat verified rankings for finalized typist sessions.
+            Anti-cheat verified rankings. Active session scores update dynamically in real time and become permanently locked upon finalization.
           </p>
         </div>
 
@@ -158,7 +173,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
         </div>
       </div>
 
-      {/* Interactive Category Tabs & Search Bar */}
+      {/* Interactive Category Tabs, Status Filter & Search Bar */}
       <div className="lb-controls-container">
         <div className="lb-tabs-group">
           {/* Primary Mode Tabs */}
@@ -241,6 +256,34 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
               </>
             )}
           </div>
+
+          {/* Status Filter Pills (All / Finalized / In Session) */}
+          <div className="mode-group status-filter-group" style={{ background: 'var(--color-surface)', padding: '0.3rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-surface-border)' }}>
+            <button
+              className={`mode-btn ${statusFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('all')}
+              title="Show all scores (Finalized & Active Sessions)"
+            >
+              <Layers size={14} />
+              <span>All</span>
+            </button>
+            <button
+              className={`mode-btn ${statusFilter === 'finalized' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('finalized')}
+              title="Show only finalized & locked sessions"
+            >
+              <Lock size={14} />
+              <span>Finalized</span>
+            </button>
+            <button
+              className={`mode-btn ${statusFilter === 'pending' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('pending')}
+              title="Show active provisional session scores"
+            >
+              <span className="live-dot" style={{ display: 'inline-block' }} />
+              <span>In Session</span>
+            </button>
+          </div>
         </div>
 
         {/* Typist Search Input */}
@@ -261,8 +304,9 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
         <table className="lb-table fullwidth">
           <thead>
             <tr>
-              <th style={{ width: '80px' }}>Rank</th>
+              <th style={{ width: '70px' }}>Rank</th>
               <th>Typist</th>
+              <th style={{ width: '130px' }}>Status</th>
               <th>WPM</th>
               <th>Raw WPM</th>
               <th>Accuracy</th>
@@ -278,6 +322,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
                   <tr key={`skeleton_${i}`} className="lb-skeleton-row">
                     <td><div className="skeleton-pill rank" /></td>
                     <td><div className="skeleton-pill user" /></td>
+                    <td><div className="skeleton-pill stat" /></td>
                     <td><div className="skeleton-pill wpm" /></td>
                     <td><div className="skeleton-pill stat" /></td>
                     <td><div className="skeleton-pill stat" /></td>
@@ -288,14 +333,14 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
               </>
             ) : paginatedEntries.length === 0 ? (
               <tr>
-                <td colSpan={7} className="lb-empty-cell">
+                <td colSpan={8} className="lb-empty-cell">
                   <div className="lb-empty-state">
                     <Trophy size={42} color="var(--color-sub)" opacity={0.6} />
                     <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-main)' }}>
-                      No ranked entries for {selectedMode} {selectedDetail} yet
+                      No ranked entries for {selectedMode} {selectedDetail} {statusFilter !== 'all' ? `(${statusFilter})` : ''} yet
                     </div>
                     <p style={{ fontSize: '0.88rem', color: 'var(--color-sub)', maxWidth: '400px', lineHeight: 1.5 }}>
-                      Be the first to complete a test and finalize your session to claim the #1 spot on this leaderboard!
+                      Start a session or take a test to appear on the leaderboard in real time!
                     </p>
                     <button className="btn-primary" onClick={onNavigateToTest} style={{ marginTop: '0.5rem' }}>
                       <Sparkles size={16} />
@@ -348,10 +393,24 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
                         )}
                         {isCurrentUser && (
                           <span className="lb-you-chip">
-                            You
+                            {entry.isFinalized ? 'You (Finalized)' : 'You (In Session)'}
                           </span>
                         )}
                       </div>
+                    </td>
+
+                    <td>
+                      {entry.isFinalized ? (
+                        <span className="lb-status-chip finalized" title="Finalized & locked on leaderboard">
+                          <Lock size={12} />
+                          <span>Finalized</span>
+                        </span>
+                      ) : (
+                        <span className="lb-status-chip pending" title="Active session - provisional score">
+                          <span className="live-dot" />
+                          <span>In Session</span>
+                        </span>
+                      )}
                     </td>
 
                     <td className="lb-wpm-cell">

@@ -160,6 +160,19 @@ export const App: React.FC = () => {
       if (updatedSession) {
         setCurrentSession({ ...updatedSession });
       }
+
+      // Automatically sync provisional/pending score to live MongoDB Atlas leaderboard
+      if (rawResult.wpm > 0) {
+        MozTypeApi.submitPendingScore({
+          username: currentSession.username,
+          wpm: rawResult.wpm,
+          rawWpm: rawResult.rawWpm,
+          accuracy: rawResult.accuracy,
+          consistency: rawResult.consistency,
+          mode: rawResult.mode,
+          modeDetail: rawResult.modeDetail
+        });
+      }
     }
 
     // 5. Asynchronously persist result to live MongoDB Atlas

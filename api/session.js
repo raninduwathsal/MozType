@@ -56,9 +56,88 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. Finalize session
+    // 2. Update pending score for active session (not finalized)
+    if (action === 'update-score' || action === 'submit-pending') {
+      const numWpm = Number(body.wpm ?? bestWpm);
+      const numRaw = Number(body.rawWpm ?? body.raw ?? Math.round(numWpm * 1.05 * 10) / 10);
+      const numAcc = Number(body.accuracy ?? body.acc ?? 98.5);
+      const numConsistency = Number(body.consistency ?? 88.0);
+      const numMode2 = isNaN(Number(mode2)) ? mode2 : Number(mode2);
+
+      if (numWpm > 0) {
+        // Find if an entry already exists
+        const existingEntry = await lbCol.findOne({
+          username: cleanUsername,
+          mode,
+          mode2: numMode2,
+          language
+        });
+
+        // Only update if no existing entry, or existing is not finalized, or new score is higher
+        if (!existingEntry || numWpm >= existingEntry.wpm) {
+          const higherCount = await lbCol.countDocuments({
+            mode,
+            mode2: numMode2,
+            language,
+            wpm: { $gt: numWpm }
+          });
+
+          const currentRank = higherCount + 1;
+          const isUserFinalized = existingEntry ? Boolean(existingEntry.isFinalized) : false;
+
+          const pendingEntry = {
+            id: existingEntry?.id || `lb_${Date.now()}_${cleanUsername}`,
+            rank: currentRank,
+            username: cleanUsername,
+            wpm: numWpm,
+            rawWpm: numRaw,
+            accuracy: numAcc,
+            consistency: numConsistency,
+            mode,
+            mode2: numMode2,
+            language,
+            timestamp: Date.now(),
+            isFinalized: isUserFinalized // Keep finalized if already finalized, else false (pending)
+          };
+
+          await lbCol.updateOne(
+            {
+              username: cleanUsername,
+              mode,
+              mode2: numMode2,
+              language
+            },
+            { $set: pendingEntry },
+            { upsert: true, collation: { locale: 'en', strength: 2 } }
+          );
+
+          console.log(`[Vercel Serverless /api/session] Updated provisional score for @${cleanUsername}: ${numWpm} WPM (Rank #${currentRank}, Finalized: ${isUserFinalized})`);
+
+          return res.status(200).json({
+            success: true,
+            message: 'Pending score updated on leaderboard',
+            rank: currentRank,
+            isFinalized: isUserFinalized,
+            wpm: numWpm
+          });
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'No score update required',
+        wpm: numWpm
+      });
+    }
+
+    // 3. Finalize session
     if (action === 'finalize') {
       const now = new Date();
+      const numWpm = Number(body.wpm ?? bestWpm);
+      const numRaw = Number(body.rawWpm ?? body.raw ?? Math.round(numWpm * 1.05 * 10) / 10);
+      const numAcc = Number(body.accuracy ?? body.acc ?? 98.5);
+      const numConsistency = Number(body.consistency ?? 88.0);
+      const numMode2 = isNaN(Number(mode2)) ? mode2 : Number(mode2);
 
       const userDoc = {
         username: cleanUsername,
@@ -70,10 +149,10 @@ export default async function handler(req, res) {
           [mode]: {
             [String(mode2)]: {
               [language]: {
-                wpm: bestWpm,
-                raw: Math.round(bestWpm * 1.05 * 10) / 10,
-                acc: 98.5,
-                consistency: 88.0,
+                wpm: numWpm,
+                raw: numRaw,
+                acc: numAcc,
+                consistency: numConsistency,
                 timestamp: now
               }
             }
@@ -87,13 +166,13 @@ export default async function handler(req, res) {
         { upsert: true, collation: { locale: 'en', strength: 2 } }
       );
 
-      // If bestWpm > 0, update leaderboard entry
-      if (bestWpm > 0) {
+      // If wpm > 0, finalize leaderboard entry
+      if (numWpm > 0) {
         const higherCount = await lbCol.countDocuments({
           mode,
-          mode2: isNaN(Number(mode2)) ? mode2 : Number(mode2),
+          mode2: numMode2,
           language,
-          wpm: { $gt: bestWpm }
+          wpm: { $gt: numWpm }
         });
 
         const newRank = higherCount + 1;
@@ -102,12 +181,12 @@ export default async function handler(req, res) {
           id: `lb_${Date.now()}_${cleanUsername}`,
           rank: newRank,
           username: cleanUsername,
-          wpm: bestWpm,
-          rawWpm: Math.round(bestWpm * 1.05 * 10) / 10,
-          accuracy: 98.5,
-          consistency: 88.0,
+          wpm: numWpm,
+          rawWpm: numRaw,
+          accuracy: numAcc,
+          consistency: numConsistency,
           mode: mode,
-          mode2: isNaN(Number(mode2)) ? mode2 : Number(mode2),
+          mode2: numMode2,
           language: language,
           timestamp: Date.now(),
           isFinalized: true
@@ -117,21 +196,21 @@ export default async function handler(req, res) {
           {
             username: cleanUsername,
             mode,
-            mode2: isNaN(Number(mode2)) ? mode2 : Number(mode2),
+            mode2: numMode2,
             language
           },
           { $set: lbEntry },
           { upsert: true, collation: { locale: 'en', strength: 2 } }
         );
 
-        console.log(`[Vercel Serverless /api/session] Finalized session for @${cleanUsername}: ${bestWpm} WPM -> Ranked #${newRank} in ${mode} ${mode2}`);
+        console.log(`[Vercel Serverless /api/session] Finalized session for @${cleanUsername}: ${numWpm} WPM -> Ranked #${newRank} in ${mode} ${mode2}`);
       }
 
       return res.status(200).json({
         success: true,
         message: `Session for "${cleanUsername}" finalized and submitted to MongoDB Atlas!`,
         username: cleanUsername,
-        bestWpm
+        bestWpm: numWpm
       });
     }
 

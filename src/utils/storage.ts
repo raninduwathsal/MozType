@@ -122,6 +122,25 @@ export class StorageDAL {
     } catch {
       // ignore
     }
+
+    // Also record/update pending entry on the local leaderboard so user can see provisional ranking
+    if (result.wpm > 0) {
+      const pendingEntry: LeaderboardEntry = {
+        id: `lb_${Date.now()}_${session.username}`,
+        rank: 0,
+        username: session.username,
+        wpm: result.wpm,
+        rawWpm: result.rawWpm,
+        accuracy: result.accuracy,
+        consistency: result.consistency,
+        mode: result.mode,
+        modeDetail: result.modeDetail,
+        timestamp: Date.now(),
+        isFinalized: false
+      };
+      this.addLeaderboardEntry(pendingEntry);
+    }
+
     return session;
   }
 
@@ -141,6 +160,22 @@ export class StorageDAL {
       } catch {
         // ignore
       }
+    }
+
+    // Mark all existing entries for this username as isFinalized: true
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.LEADERBOARD);
+      if (stored) {
+        const allEntries: LeaderboardEntry[] = JSON.parse(stored);
+        allEntries.forEach(e => {
+          if (e.username.toLowerCase() === session.username.toLowerCase()) {
+            e.isFinalized = true;
+          }
+        });
+        localStorage.setItem(STORAGE_KEYS.LEADERBOARD, JSON.stringify(allEntries));
+      }
+    } catch {
+      // ignore
     }
 
     // Submit best result to leaderboard if session has recorded scores
@@ -276,11 +311,23 @@ export class StorageDAL {
       );
 
       if (existingIdx >= 0) {
-        if (entry.wpm > allEntries[existingIdx].wpm) {
-          allEntries[existingIdx] = entry;
+        const existing = allEntries[existingIdx];
+        const shouldUpdateScore = entry.wpm >= existing.wpm;
+        const finalizedStatus = existing.isFinalized || Boolean(entry.isFinalized);
+
+        if (shouldUpdateScore) {
+          allEntries[existingIdx] = {
+            ...entry,
+            isFinalized: finalizedStatus
+          };
+        } else if (entry.isFinalized && !existing.isFinalized) {
+          allEntries[existingIdx].isFinalized = true;
         }
       } else {
-        allEntries.push(entry);
+        allEntries.push({
+          ...entry,
+          isFinalized: Boolean(entry.isFinalized)
+        });
       }
 
       localStorage.setItem(STORAGE_KEYS.LEADERBOARD, JSON.stringify(allEntries));

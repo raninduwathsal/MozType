@@ -29,19 +29,42 @@ export default async function handler(req, res) {
       query.username = { $regex: search.trim(), $options: 'i' };
     }
 
-    // Try matching with numeric mode2, fallback to string if necessary
-    let entries = await lbCol.find(query).sort({ rank: 1 }).limit(250).toArray();
-    if (entries.length === 0 && !isNaN(Number(mode2))) {
-      query.mode2 = String(mode2);
-      entries = await lbCol.find(query).sort({ rank: 1 }).limit(250).toArray();
+    const statusFilter = url.searchParams.get('status') || 'all'; // 'all' | 'finalized' | 'pending'
+    if (statusFilter === 'finalized') {
+      query.isFinalized = true;
+    } else if (statusFilter === 'pending') {
+      query.isFinalized = { $ne: true };
     }
 
-    console.log(`[Vercel Serverless /api/leaderboard] Query: mode=${mode}, mode2=${mode2}, search="${search}" | Found: ${entries.length} typists`);
+    // Try matching with numeric mode2, fallback to string if necessary
+    let entries = await lbCol
+      .find(query)
+      .sort({ wpm: -1, accuracy: -1, timestamp: 1 })
+      .limit(250)
+      .toArray();
+
+    if (entries.length === 0 && !isNaN(Number(mode2))) {
+      query.mode2 = String(mode2);
+      entries = await lbCol
+        .find(query)
+        .sort({ wpm: -1, accuracy: -1, timestamp: 1 })
+        .limit(250)
+        .toArray();
+    }
+
+    // Assign dynamic 1-indexed ranks and guarantee isFinalized flag
+    const rankedEntries = entries.map((entry, index) => ({
+      ...entry,
+      rank: index + 1,
+      isFinalized: Boolean(entry.isFinalized)
+    }));
+
+    console.log(`[Vercel Serverless /api/leaderboard] Query: mode=${mode}, mode2=${mode2}, status=${statusFilter}, search="${search}" | Found: ${rankedEntries.length} typists`);
 
     return res.status(200).json({
       success: true,
-      data: entries,
-      count: entries.length,
+      data: rankedEntries,
+      count: rankedEntries.length,
       mode,
       mode2,
       language

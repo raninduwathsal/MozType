@@ -30,12 +30,14 @@ export class MozTypeApi {
     mode: TestMode = 'time',
     modeDetail: string | number = 15,
     language: string = 'english',
-    search: string = ''
+    search: string = '',
+    status: 'all' | 'finalized' | 'pending' = 'all'
   ): Promise<LeaderboardEntry[] | null> {
     const params = new URLSearchParams({
       mode,
       mode2: String(modeDetail),
       language,
+      status,
       ...(search ? { search } : {})
     });
 
@@ -68,13 +70,49 @@ export class MozTypeApi {
   }
 
   /**
-   * Finalizes a session in MongoDB Atlas and calculates global ranking
+   * Submits or updates an active session's provisional score to MongoDB Atlas leaderboard (isFinalized: false)
+   */
+  public static async submitPendingScore(params: {
+    username: string;
+    wpm: number;
+    rawWpm?: number;
+    accuracy?: number;
+    consistency?: number;
+    mode?: TestMode;
+    modeDetail?: string | number;
+    language?: string;
+  }): Promise<{ success: boolean; rank?: number; isFinalized?: boolean } | null> {
+    return await this.request<{ success: boolean; rank?: number; isFinalized?: boolean }>(
+      '/api/session',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'update-score',
+          username: params.username,
+          wpm: params.wpm,
+          rawWpm: params.rawWpm,
+          accuracy: params.accuracy,
+          consistency: params.consistency,
+          mode: params.mode || 'time',
+          mode2: params.modeDetail || 15,
+          language: params.language || 'english'
+        })
+      }
+    );
+  }
+
+  /**
+   * Finalizes a session in MongoDB Atlas and locks the username permanently (isFinalized: true)
    */
   public static async finalizeSession(params: {
     username: string;
     bestWpm: number;
+    rawWpm?: number;
+    accuracy?: number;
+    consistency?: number;
     mode?: TestMode;
     modeDetail?: string | number;
+    language?: string;
   }): Promise<{ success: boolean; message?: string } | null> {
     return await this.request<{ success: boolean; message?: string }>(
       '/api/session',
@@ -84,8 +122,13 @@ export class MozTypeApi {
           action: 'finalize',
           username: params.username,
           bestWpm: params.bestWpm,
+          wpm: params.bestWpm,
+          rawWpm: params.rawWpm,
+          accuracy: params.accuracy,
+          consistency: params.consistency,
           mode: params.mode || 'time',
-          mode2: params.modeDetail || 15
+          mode2: params.modeDetail || 15,
+          language: params.language || 'english'
         })
       }
     );
